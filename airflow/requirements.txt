@@ -2,7 +2,7 @@ dbt-core==1.8.2
 dbt-postgres==1.8.2
 great-expectations==0.18.19
 pandas==2.1.4
-numpy==1.26.4
+numpy==2.5.2
 scikit-learn==1.5.1
 networkx==3.3
 psycopg2-binary==2.9.9
