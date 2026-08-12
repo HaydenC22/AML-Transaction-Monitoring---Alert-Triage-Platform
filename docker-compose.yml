@@ -92,10 +92,18 @@ services:
   # report -- so `docker compose up` alone leaves alerts ready for the API/frontend
   # to show, without requiring a manual Airflow DAG trigger first. The Airflow DAG
   # remains the way to re-run this same sequence on a schedule.
+  # No custom entrypoint here (unlike airflow-init): the base image's own
+  # entrypoint already execs arbitrary commands correctly, and keeping the
+  # default lets `docker compose run detection-init <other command>` (e.g. the
+  # README's test invocations) work without every ad-hoc command needing to
+  # route through `bash -c` itself -- an explicit `entrypoint: /bin/bash` here
+  # previously broke that, since compose keeps the entrypoint and only swaps
+  # the command, producing the unrunnable `bash python -m pytest ...`.
   detection-init:
     <<: *airflow-common
-    entrypoint: /bin/bash
+    working_dir: /opt
     command:
+      - bash
       - -c
       - >-
         python -m detection.run_detection &&
