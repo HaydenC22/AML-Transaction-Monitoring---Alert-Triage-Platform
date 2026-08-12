@@ -1,0 +1,34 @@
+.severity-stamp {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1.5px solid currentColor;
+  transform: rotate(-1.5deg);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.severity-stamp-low {
+  color: var(--status-low);
+  background: var(--status-low-bg);
+}
+
+.severity-stamp-medium {
+  color: var(--status-medium);
+  background: var(--status-medium-bg);
+}
+
+.severity-stamp-high {
+  color: var(--status-high);
+  background: var(--status-high-bg);
+}
+
+.severity-stamp-critical {
+  color: var(--status-critical);
+  background: var(--status-critical-bg);
+}

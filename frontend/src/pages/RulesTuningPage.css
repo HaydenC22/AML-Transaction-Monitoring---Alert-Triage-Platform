@@ -1,0 +1,36 @@
+.threshold-callout {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.tuning-note {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 0 0 22px;
+  max-width: 640px;
+}
+
+.tuning-note code {
+  font-family: var(--font-mono);
+  background: var(--surface-sunken);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.tuning-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 980px) {
+  .threshold-callout {
+    grid-template-columns: 1fr;
+  }
+  .tuning-grid {
+    grid-template-columns: 1fr;
+  }
+}

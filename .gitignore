@@ -39,6 +39,7 @@ detection/evaluation/reports/*
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/tsconfig.tsbuildinfo
 
 # Editors / OS
 .vscode/

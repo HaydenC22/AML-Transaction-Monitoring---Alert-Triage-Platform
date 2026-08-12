@@ -87,6 +87,30 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # One-shot: runs after pipeline-init builds the star schema. Runs the detection
+  # engine, builds+tests the marts/detection layer, and generates the evaluation
+  # report -- so `docker compose up` alone leaves alerts ready for the API/frontend
+  # to show, without requiring a manual Airflow DAG trigger first. The Airflow DAG
+  # remains the way to re-run this same sequence on a schedule.
+  detection-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - >-
+        python -m detection.run_detection &&
+        cd /opt/dbt &&
+        dbt run --select marts.detection --profiles-dir profiles --target docker &&
+        dbt test --select marts.detection --profiles-dir profiles --target docker &&
+        cd /opt &&
+        python -m detection.evaluation.evaluate_thresholds
+    depends_on:
+      pipeline-init:
+        condition: service_completed_successfully
+      pg-warehouse:
+        condition: service_healthy
+    restart: "no"
+
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
@@ -116,11 +140,37 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  api:
+    build:
+      context: ./api
+    environment:
+      API_DATABASE_URL: postgresql://${WAREHOUSE_POSTGRES_USER:-aml}:${WAREHOUSE_POSTGRES_PASSWORD:-aml}@pg-warehouse:5432/${WAREHOUSE_POSTGRES_DB:-aml_warehouse}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:5173}
+    ports:
+      - "8000:8000"
+    depends_on:
+      pg-warehouse:
+        condition: service_healthy
+      detection-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "5173:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   pg_airflow_data:
   pg_warehouse_data:
   airflow_logs:
-
-# api and frontend services are added in Week 3 once their Dockerfiles exist
-# (see docs/adr and the project build plan). Until then this compose file covers
-# the data pipeline: ingestion -> dbt star schema -> Airflow orchestration.
