@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  WAREHOUSE_DATABASE_URL: postgresql://aml:aml@localhost:5432/aml_warehouse
+  WAREHOUSE_POSTGRES_USER: aml
+  WAREHOUSE_POSTGRES_PASSWORD: aml
+  WAREHOUSE_POSTGRES_DB: aml_warehouse
+  WAREHOUSE_POSTGRES_HOST: localhost
+  WAREHOUSE_POSTGRES_PORT: "5432"
+  API_DATABASE_URL: postgresql://aml:aml@localhost:5432/aml_warehouse
+
+jobs:
+  detection-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r detection/requirements.txt
+      - run: python -m pytest detection/tests -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc -b
+      - run: npm test
+      - run: npm run build
+
+  # Mirrors the local docker-compose bootstrap (pipeline-init -> detection-init):
+  # ingest -> GE (raw) -> dbt star schema -> GE (marts) -> detection engine ->
+  # dbt detection marts -> evaluation report -> API tests against the populated warehouse.
+  pipeline-and-api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aml
+          POSTGRES_PASSWORD: aml
+          POSTGRES_DB: aml_warehouse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aml"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install pipeline + detection + GE + API dependencies
+        run: |
+          pip install -r dbt/requirements.txt
+          pip install -r detection/requirements.txt
+          pip install -r api/requirements.txt
+          pip install -r great_expectations/requirements.txt
+
+      - name: Load raw data
+        run: python scripts/load_raw_to_warehouse.py
+
+      - name: Great Expectations - validate raw layer
+        run: python great_expectations/build_and_run_suites.py --layer raw
+
+      - name: dbt deps
+        working-directory: dbt
+        run: dbt deps
+
+      - name: dbt seed
+        working-directory: dbt
+        run: dbt seed --profiles-dir profiles --target ci
+
+      - name: dbt run (staging/intermediate/marts.core)
+        working-directory: dbt
+        run: dbt run --select staging intermediate marts.core --profiles-dir profiles --target ci
+
+      - name: dbt test (staging/intermediate/marts.core)
+        working-directory: dbt
+        run: dbt test --select staging intermediate marts.core --indirect-selection=cautious --profiles-dir profiles --target ci
+
+      - name: Great Expectations - validate marts layer
+        run: python great_expectations/build_and_run_suites.py --layer marts
+
+      - name: Run detection engine
+        run: python -m detection.run_detection
+
+      - name: dbt run + test (marts.detection)
+        working-directory: dbt
+        run: |
+          dbt run --select marts.detection --profiles-dir profiles --target ci
+          dbt test --select marts.detection --profiles-dir profiles --target ci
+
+      - name: Generate evaluation report
+        run: python -m detection.evaluation.evaluate_thresholds
+
+      - name: Run API tests
+        working-directory: api
+        run: python -m pytest tests -v
+
+      - name: Upload evaluation report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-report
+          path: |
+            docs/metrics/latest_evaluation_report.md
+            docs/metrics/threshold_curve.png
