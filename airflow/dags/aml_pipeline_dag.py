@@ -7,7 +7,7 @@ reload of the (static, synthetic) source file on every run rather than true
 incremental day-by-day slicing -- a full-refresh batch pattern that's common and
 appropriate at this data volume. Incremental checkpoint-based ingestion is a
 documented "what's next" item once the pipeline runs against a live, growing
-source. See docs/adr/0002-split-local-vs-hosted-demo.md for the broader
+source. See docs/adr/0005-split-local-pipeline-vs-hosted-demo.md for the broader
 local-vs-hosted design this DAG only ever needs to run locally under.
 """
 
