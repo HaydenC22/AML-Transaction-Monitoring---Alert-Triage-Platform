@@ -1,0 +1,109 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: One row per simulated calendar day across the 31-day PaySim simulation window.
+    columns:
+      - name: date_key
+        tests: [not_null, unique]
+      - name: full_date
+        tests: [not_null]
+
+  - name: dim_customer
+    description: >
+      One row per unique account that acted as a transaction origin at least once.
+      Customer attributes (type, risk rating, onboarding date) are synthetically enriched,
+      since PaySim carries no customer master data.
+    columns:
+      - name: customer_key
+        tests: [not_null, unique]
+      - name: customer_nk
+        tests: [not_null]
+      - name: risk_rating
+        tests:
+          - accepted_values:
+              values: ["low", "medium", "high"]
+
+  - name: dim_account
+    description: One row per unique account appearing as either an origin or destination.
+    columns:
+      - name: account_key
+        tests: [not_null, unique]
+      - name: account_nk
+        tests: [not_null, unique]
+      - name: account_role_type
+        tests:
+          - accepted_values:
+              values: ["customer", "merchant"]
+
+  - name: dim_counterparty
+    description: >
+      Role-playing dimension over the account entity, scoped to the destination side of a
+      transaction, carrying counterparty-specific risk attributes independent of account identity.
+    columns:
+      - name: counterparty_key
+        tests: [not_null, unique]
+      - name: counterparty_nk
+        tests: [not_null]
+      - name: counterparty_category
+        tests:
+          - accepted_values:
+              values: ["peer", "merchant", "exchange", "unknown"]
+
+  - name: dim_geography
+    description: One row per synthetic jurisdiction used to enrich account geography.
+    columns:
+      - name: geography_key
+        tests: [not_null, unique]
+      - name: country_code
+        tests: [not_null, unique]
+      - name: fatf_risk_category
+        tests:
+          - accepted_values:
+              values: ["standard", "monitored", "high_risk"]
+
+  - name: fact_transactions
+    description: One row per PaySim transaction record, the grain of the star schema.
+    columns:
+      - name: transaction_key
+        tests: [not_null, unique]
+      - name: date_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+      - name: origin_account_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_account')
+              field: account_key
+      - name: dest_account_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_account')
+              field: account_key
+      - name: counterparty_key
+        tests:
+          - relationships:
+              to: ref('dim_counterparty')
+              field: counterparty_key
+      - name: origin_geography_key
+        tests:
+          - relationships:
+              to: ref('dim_geography')
+              field: geography_key
+      - name: dest_geography_key
+        tests:
+          - relationships:
+              to: ref('dim_geography')
+              field: geography_key
+      - name: transaction_type
+        tests:
+          - accepted_values:
+              values: ["CASH_IN", "CASH_OUT", "DEBIT", "PAYMENT", "TRANSFER"]
+      - name: amount
+        tests:
+          - not_null

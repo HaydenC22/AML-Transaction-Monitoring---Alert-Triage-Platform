@@ -1,0 +1,25 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: paysim_transactions
+        description: >
+          Raw PaySim-schema synthetic transaction rows, loaded as-is from
+          data/sample/paysim_sample.csv (or a real PaySim CSV dropped into data/raw/)
+          by scripts/load_raw_to_warehouse.py. See data/sample/DATA_DICTIONARY.md.
+        columns:
+          - name: step
+            description: Simulated hour offset, 0-743
+          - name: type
+            description: Transaction type (CASH_IN, CASH_OUT, DEBIT, PAYMENT, TRANSFER)
+          - name: amount
+          - name: nameorig
+          - name: oldbalanceorg
+          - name: newbalanceorig
+          - name: namedest
+          - name: oldbalancedest
+          - name: newbalancedest
+          - name: isfraud
+          - name: isflaggedfraud

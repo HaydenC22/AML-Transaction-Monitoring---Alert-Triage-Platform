@@ -1,0 +1,117 @@
+name: aml-transaction-monitoring
+
+x-airflow-common: &airflow-common
+  build:
+    context: ./airflow
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_POSTGRES_USER:-airflow}:${AIRFLOW_POSTGRES_PASSWORD:-airflow}@pg-airflow/${AIRFLOW_POSTGRES_DB:-airflow}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY:-}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-change-me-locally}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+    WAREHOUSE_DATABASE_URL: postgresql+psycopg2://${WAREHOUSE_POSTGRES_USER:-aml}:${WAREHOUSE_POSTGRES_PASSWORD:-aml}@pg-warehouse:5432/${WAREHOUSE_POSTGRES_DB:-aml_warehouse}
+    SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/plugins:/opt/airflow/plugins
+    - airflow_logs:/opt/airflow/logs
+    - ./dbt:/opt/dbt
+    - ./detection:/opt/detection
+    - ./great_expectations:/opt/great_expectations
+    - ./data:/opt/data
+  depends_on:
+    pg-airflow:
+      condition: service_healthy
+    pg-warehouse:
+      condition: service_healthy
+
+services:
+  pg-airflow:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${AIRFLOW_POSTGRES_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_POSTGRES_PASSWORD:-airflow}
+      POSTGRES_DB: ${AIRFLOW_POSTGRES_DB:-airflow}
+    volumes:
+      - pg_airflow_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_POSTGRES_USER:-airflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pg-warehouse:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${WAREHOUSE_POSTGRES_USER:-aml}
+      POSTGRES_PASSWORD: ${WAREHOUSE_POSTGRES_PASSWORD:-aml}
+      POSTGRES_DB: ${WAREHOUSE_POSTGRES_DB:-aml_warehouse}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_warehouse_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_POSTGRES_USER:-aml}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: loads the sample dataset into raw.paysim_transactions, then builds and
+  # tests the full dbt star schema. Exits when done; re-run with `docker compose run pipeline-init`.
+  pipeline-init:
+    build:
+      context: .
+      dockerfile: dbt/Dockerfile
+    environment:
+      WAREHOUSE_DATABASE_URL: postgresql://${WAREHOUSE_POSTGRES_USER:-aml}:${WAREHOUSE_POSTGRES_PASSWORD:-aml}@pg-warehouse:5432/${WAREHOUSE_POSTGRES_DB:-aml_warehouse}
+      WAREHOUSE_POSTGRES_USER: ${WAREHOUSE_POSTGRES_USER:-aml}
+      WAREHOUSE_POSTGRES_PASSWORD: ${WAREHOUSE_POSTGRES_PASSWORD:-aml}
+      WAREHOUSE_POSTGRES_DB: ${WAREHOUSE_POSTGRES_DB:-aml_warehouse}
+    volumes:
+      - ./dbt:/opt/dbt
+      - ./scripts:/opt/scripts
+      - ./data:/opt/data
+    working_dir: /opt/dbt
+    depends_on:
+      pg-warehouse:
+        condition: service_healthy
+    restart: "no"
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true"
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  pg_airflow_data:
+  pg_warehouse_data:
+  airflow_logs:
+
+# api and frontend services are added in Week 3 once their Dockerfiles exist
+# (see docs/adr and the project build plan). Until then this compose file covers
+# the data pipeline: ingestion -> dbt star schema -> Airflow orchestration.

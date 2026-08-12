@@ -1,0 +1,50 @@
+# Environment / secrets
+.env
+.env.local
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/profiles/.user.yml
+
+# Great Expectations
+great_expectations/gx/uncommitted/
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+airflow/airflow-webserver.pid
+
+# Data
+data/raw/*
+!data/raw/.gitkeep
+
+# Detection reports (generated, keep only what's explicitly committed under docs/metrics)
+detection/evaluation/reports/*
+!detection/evaluation/reports/.gitkeep
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log

@@ -1,0 +1,19 @@
+country_code,country_name,region,fatf_risk_category,is_high_risk,is_sanctioned_synthetic,assignment_weight
+SG,Singapore,APAC,standard,false,false,30
+US,United States,Americas,standard,false,false,12
+GB,United Kingdom,EMEA,standard,false,false,8
+AU,Australia,APAC,standard,false,false,6
+DE,Germany,EMEA,standard,false,false,6
+JP,Japan,APAC,standard,false,false,5
+CA,Canada,Americas,standard,false,false,4
+FR,France,EMEA,standard,false,false,4
+NL,Netherlands,EMEA,standard,false,false,3
+HK,Hong Kong,APAC,standard,false,false,3
+CH,Switzerland,EMEA,standard,false,false,3
+NZ,New Zealand,APAC,standard,false,false,2
+PH,Philippines,APAC,monitored,true,false,5
+VN,Vietnam,APAC,monitored,true,false,4
+NG,Nigeria,EMEA,monitored,true,false,3
+PK,Pakistan,APAC,monitored,true,false,3
+MM,Myanmar,APAC,high_risk,true,true,2
+IR,Iran,EMEA,high_risk,true,true,1

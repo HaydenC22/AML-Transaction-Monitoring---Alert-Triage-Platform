@@ -1,0 +1,21 @@
+aml_warehouse:
+  target: docker
+  outputs:
+    docker:
+      type: postgres
+      host: pg-warehouse
+      user: "{{ env_var('WAREHOUSE_POSTGRES_USER', 'aml') }}"
+      pass: "{{ env_var('WAREHOUSE_POSTGRES_PASSWORD', 'aml') }}"
+      port: 5432
+      dbname: "{{ env_var('WAREHOUSE_POSTGRES_DB', 'aml_warehouse') }}"
+      schema: raw
+      threads: 4
+    ci:
+      type: postgres
+      host: "{{ env_var('WAREHOUSE_POSTGRES_HOST', 'localhost') }}"
+      user: "{{ env_var('WAREHOUSE_POSTGRES_USER', 'aml') }}"
+      pass: "{{ env_var('WAREHOUSE_POSTGRES_PASSWORD', 'aml') }}"
+      port: "{{ env_var('WAREHOUSE_POSTGRES_PORT', '5432') | as_number }}"
+      dbname: "{{ env_var('WAREHOUSE_POSTGRES_DB', 'aml_warehouse') }}"
+      schema: raw
+      threads: 4
