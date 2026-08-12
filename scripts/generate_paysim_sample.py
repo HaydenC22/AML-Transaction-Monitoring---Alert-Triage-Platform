@@ -22,8 +22,13 @@ N_STEPS = 744  # 31 simulated days x 24 hourly steps, matching PaySim's step sem
 N_CUSTOMERS = 10_000
 N_MERCHANTS = 800
 N_MULES = 40  # small pool of accounts fraud episodes launder funds through
-N_FRAUD_EPISODES = 260
+N_FRAUD_EPISODES = 200  # TRANSFER-then-CASH_OUT drain pattern
+N_STRUCTURING_EPISODES = 35  # sub-threshold splitting pattern
+N_CIRCULAR_EPISODES = 15  # funds looping back to origin through several hops
 AVG_TXNS_PER_STEP = 270  # ~200k rows total across 744 steps
+
+STRUCTURING_BAND_LOW = 9_000
+STRUCTURING_BAND_HIGH = 9_999
 
 TXN_TYPE_WEIGHTS = {
     "CASH_OUT": 0.35,
@@ -154,13 +159,104 @@ def fraud_episode(rng: np.random.Generator, accounts: dict, step: int) -> list[d
     return rows
 
 
+def structuring_episode(rng: np.random.Generator, accounts: dict, step: int) -> list[dict]:
+    """Several sub-threshold TRANSFERs from one account on the same day, splitting
+    a larger sum to stay under a round reporting threshold -- classic smurfing."""
+    balances = accounts["balances"]
+    n_hops = int(rng.integers(3, 6))
+    structurer = rng.choice(accounts["customers"])
+    required = STRUCTURING_BAND_HIGH * n_hops
+    if balances[structurer] < required:
+        return []
+
+    rows = []
+    for hop in range(n_hops):
+        amount = round(rng.uniform(STRUCTURING_BAND_LOW, STRUCTURING_BAND_HIGH), 2)
+        dest = rng.choice(accounts["customers"])
+        while dest == structurer:
+            dest = rng.choice(accounts["customers"])
+        old_orig = balances[structurer]
+        new_orig = round(old_orig - amount, 2)
+        old_dest = balances[dest]
+        new_dest = round(old_dest + amount, 2)
+        balances[structurer] = new_orig
+        balances[dest] = new_dest
+        rows.append(
+            {
+                "step": step,
+                "type": "TRANSFER",
+                "amount": amount,
+                "nameOrig": structurer,
+                "oldbalanceOrg": round(old_orig, 2),
+                "newbalanceOrig": new_orig,
+                "nameDest": dest,
+                "oldbalanceDest": round(old_dest, 2),
+                "newbalanceDest": new_dest,
+                "isFraud": 1,
+                "isFlaggedFraud": 0,
+            }
+        )
+    return rows
+
+
+def circular_flow_episode(rng: np.random.Generator, accounts: dict, step: int) -> list[dict]:
+    """A short chain of TRANSFERs that loops back to its starting account within a
+    few hours -- layering funds through intermediaries to obscure the trail."""
+    balances = accounts["balances"]
+    chain_length = int(rng.integers(3, 5))
+    chain = rng.choice(accounts["customers"], size=chain_length, replace=False).tolist()
+    origin_balance = balances[chain[0]]
+    if origin_balance < 5_000:
+        return []
+
+    amount = round(origin_balance * rng.uniform(0.3, 0.6), 2)
+    rows = []
+    for hop in range(chain_length):
+        sender = chain[hop]
+        receiver = chain[(hop + 1) % chain_length]
+        old_orig = balances[sender]
+        hop_amount = min(amount, old_orig)
+        if hop_amount <= 0:
+            break
+        new_orig = round(old_orig - hop_amount, 2)
+        old_dest = balances[receiver]
+        new_dest = round(old_dest + hop_amount, 2)
+        balances[sender] = new_orig
+        balances[receiver] = new_dest
+        rows.append(
+            {
+                "step": min(step + hop, N_STEPS - 1),
+                "type": "TRANSFER",
+                "amount": hop_amount,
+                "nameOrig": sender,
+                "oldbalanceOrg": round(old_orig, 2),
+                "newbalanceOrig": new_orig,
+                "nameDest": receiver,
+                "oldbalanceDest": round(old_dest, 2),
+                "newbalanceDest": new_dest,
+                "isFraud": 1,
+                "isFlaggedFraud": 0,
+            }
+        )
+        amount = hop_amount * 0.97  # small skim at each hop
+    return rows
+
+
 def main() -> None:
     rng = np.random.default_rng(SEED)
     random.seed(SEED)
     accounts = make_accounts(rng)
 
-    fraud_steps = sorted(rng.choice(range(N_STEPS - 3), size=N_FRAUD_EPISODES, replace=False).tolist())
-    fraud_step_set = set(fraud_steps)
+    all_episode_steps = rng.choice(
+        range(N_STEPS - 5),
+        size=N_FRAUD_EPISODES + N_STRUCTURING_EPISODES + N_CIRCULAR_EPISODES,
+        replace=False,
+    )
+    drain_steps = set(all_episode_steps[:N_FRAUD_EPISODES].tolist())
+    structuring_steps = set(
+        all_episode_steps[N_FRAUD_EPISODES : N_FRAUD_EPISODES + N_STRUCTURING_EPISODES].tolist()
+    )
+    circular_steps = set(all_episode_steps[N_FRAUD_EPISODES + N_STRUCTURING_EPISODES :].tolist())
 
     rows: list[dict] = []
     for step in range(N_STEPS):
@@ -169,8 +265,12 @@ def main() -> None:
             row = legit_transaction(rng, accounts, step)
             if row is not None:
                 rows.append(row)
-        if step in fraud_step_set:
+        if step in drain_steps:
             rows.extend(fraud_episode(rng, accounts, step))
+        if step in structuring_steps:
+            rows.extend(structuring_episode(rng, accounts, step))
+        if step in circular_steps:
+            rows.extend(circular_flow_episode(rng, accounts, step))
 
     rows.sort(key=lambda r: r["step"])
 

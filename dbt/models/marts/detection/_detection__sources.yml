@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: detection
+    schema: detection
+    tables:
+      - name: alerts
+        description: >
+          Alert output of the detection engine (detection/run_detection.py), written
+          directly by that Python job -- not a dbt model. This source lets the
+          marts/detection layer document lineage and apply dbt tests to it like any
+          other warehouse table.
+      - name: alert_rule_triggers
+        description: Junction table of which deterministic rule(s) fired for each alert.

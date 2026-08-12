@@ -1,12 +1,14 @@
 """Builds (idempotently) and runs the two Great Expectations suites for this project:
 raw-layer validation (gates the dbt run) and marts-layer validation (gates the
-detection job). Run standalone for local testing, or invoked as Airflow tasks
-`ge_validate_raw` / `ge_validate_marts` in the pipeline DAG (see airflow/dags).
+detection job). Run standalone (`python build_and_run_suites.py`) for both layers,
+or with `--layer raw` / `--layer marts` as invoked by the `ge_validate_raw` /
+`ge_validate_marts` Airflow tasks (see airflow/dags/aml_pipeline_dag.py).
 
-Exit code is non-zero if either layer's expectations fail the SLA in
+Exit code is non-zero if the requested layer's expectations fail the SLA in
 EXPECTATION_SUCCESS_SLA, so it fails the calling Airflow task fast.
 """
 
+import argparse
 import os
 import sys
 
@@ -85,24 +87,45 @@ def validate_layer(context, datasource, asset_name, schema_name, table_name, sui
     return summarize(schema_name, result)
 
 
-def main() -> int:
+def get_context_and_datasource():
     context = gx.get_context(mode="file", project_root_dir=GE_ROOT)
     datasource = context.sources.add_or_update_postgres(
         name="aml_warehouse", connection_string=DATABASE_URL
     )
+    return context, datasource
 
-    raw_ok = validate_layer(
+
+def validate_raw() -> bool:
+    context, datasource = get_context_and_datasource()
+    return validate_layer(
         context, datasource,
         "raw_paysim_transactions", "raw", "paysim_transactions",
         "raw_transactions_suite", build_raw_suite,
     )
-    marts_ok = validate_layer(
+
+
+def validate_marts() -> bool:
+    context, datasource = get_context_and_datasource()
+    return validate_layer(
         context, datasource,
         "marts_fact_transactions", "raw_marts_core", "fact_transactions",
         "marts_fact_transactions_suite", build_marts_suite,
     )
 
-    return 0 if (raw_ok and marts_ok) else 1
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--layer", choices=["raw", "marts", "all"], default="all")
+    args = parser.parse_args()
+
+    if args.layer == "raw":
+        ok = validate_raw()
+    elif args.layer == "marts":
+        ok = validate_marts()
+    else:
+        ok = validate_raw() and validate_marts()
+
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

@@ -11,9 +11,9 @@ NL,Netherlands,EMEA,standard,false,false,3
 HK,Hong Kong,APAC,standard,false,false,3
 CH,Switzerland,EMEA,standard,false,false,3
 NZ,New Zealand,APAC,standard,false,false,2
-PH,Philippines,APAC,monitored,true,false,5
-VN,Vietnam,APAC,monitored,true,false,4
-NG,Nigeria,EMEA,monitored,true,false,3
-PK,Pakistan,APAC,monitored,true,false,3
+PH,Philippines,APAC,monitored,false,false,5
+VN,Vietnam,APAC,monitored,false,false,4
+NG,Nigeria,EMEA,monitored,false,false,3
+PK,Pakistan,APAC,monitored,false,false,3
 MM,Myanmar,APAC,high_risk,true,true,2
 IR,Iran,EMEA,high_risk,true,true,1

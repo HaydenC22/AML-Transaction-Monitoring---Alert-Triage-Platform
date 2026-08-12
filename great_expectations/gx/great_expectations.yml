@@ -106,13 +106,7 @@ fluent_datasources:
         batch_metadata: {}
         table_name: paysim_transactions
         schema_name: raw
-      marts_fact_transactions:
-        type: table
-        order_by: []
-        batch_metadata: {}
-        table_name: fact_transactions
-        schema_name: raw_marts_core
-    connection_string: postgresql+psycopg2://aml:aml@pg-warehouse:5432/aml_warehouse
+    connection_string: postgresql://aml:aml@pg-warehouse:5432/aml_warehouse
 notebooks:
 include_rendered_content:
   globally: false
