@@ -6,11 +6,8 @@ platform, built end to end: ingestion, a documented star schema, data-quality ga
 a REST API, and a custom-designed analyst dashboard — orchestrated by Airflow and runnable
 with one command.
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/OWNER/REPO/actions/workflows/codeql.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/codeql.yml)
-
-> Badge URLs use an `OWNER/REPO` placeholder until this repo is pushed to GitHub — swap in the
-> real path once it has a remote (see [What's next](#whats-next)).
+[![CI](https://github.com/HaydenC22/AML-Transaction-Monitoring---Alert-Triage-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/HaydenC22/AML-Transaction-Monitoring---Alert-Triage-Platform/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/HaydenC22/AML-Transaction-Monitoring---Alert-Triage-Platform/actions/workflows/codeql.yml/badge.svg)](https://github.com/HaydenC22/AML-Transaction-Monitoring---Alert-Triage-Platform/actions/workflows/codeql.yml)
 
 ## The problem
 
